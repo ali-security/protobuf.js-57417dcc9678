@@ -19,13 +19,22 @@ var root = protobuf.Root.fromJSON({
                     type: "string"
                 }
             }
+        },
+        Loop: {
+            fields: {
+                next: {
+                    id: 1,
+                    type: "google.protobuf.Any"
+                }
+            }
         }
     }
 }).addJSON(protobuf.common["google/protobuf/any.proto"].nested).resolveAll();
 
 var Any = root.lookupType("protobuf.Any"),
     Foo = root.lookupType(".Foo"),
-    Bar = root.lookupType(".Bar");
+    Bar = root.lookupType(".Bar"),
+    Loop = root.lookupType(".Loop");
 
 tape.test("google.protobuf.Any", function(test) {
 
@@ -61,6 +70,74 @@ tape.test("google.protobuf.Any", function(test) {
     });
     obj = Foo.toObject(baz, { json: true });
     test.same(obj.foo, { "@type": "type.someurl.com/Bar", bar: "a" }, "should keep prefix in type url");
+
+    test.end();
+});
+
+tape.test("google.protobuf.Any - toObject recursion limit", function(test) {
+
+    var recursionLimit = protobuf.util.recursionLimit;
+    protobuf.util.recursionLimit = 3;
+    try {
+        var value = Loop.encode(Loop.create()).finish();
+        for (var i = 0; i < 5; ++i)
+            value = Loop.encode(Loop.create({
+                next: Any.create({
+                    type_url: "type.googleapis.com/Loop",
+                    value: value
+                })
+            })).finish();
+
+        var message = Loop.decode(value);
+
+        test.throws(function() {
+            JSON.stringify(message);
+        }, /max depth exceeded/, "should reject excessive Any JSON expansion depth");
+
+        var shallow = Loop.decode(Loop.encode(Loop.create({
+            next: Any.create({
+                type_url: "type.googleapis.com/Loop",
+                value: Loop.encode(Loop.create()).finish()
+            })
+        })).finish());
+        test.same(JSON.parse(JSON.stringify(shallow)), { next: { "@type": "type.googleapis.com/Loop" } }, "should expand Any values within the recursion limit");
+    } finally {
+        protobuf.util.recursionLimit = recursionLimit;
+    }
+
+    test.end();
+});
+
+tape.test("google.protobuf.Any - deeply nested Any with default limits", function(test) {
+
+    var depth = 1000;
+    var value = Loop.encode(Loop.create()).finish(),
+        any;
+    for (var i = 0; i < depth; ++i) {
+        any = Any.create({
+            type_url: "type.googleapis.com/Loop",
+            value: value
+        });
+        value = Loop.encode(Loop.create({ next: any })).finish();
+    }
+
+    var message = Loop.decode(value);
+
+    // Expansion is bounded either by the conversion depth guard ("max depth exceeded") or by the
+    // decoder's nesting guard ("maximum nesting depth exceeded") the expanded value is decoded with,
+    // but never by exhausting the call stack ("Maximum call stack size exceeded").
+    test.throws(function() {
+        JSON.stringify(message);
+    }, /depth exceeded/, "should reject deeply nested Any values via JSON.stringify");
+    test.throws(function() {
+        message.toJSON();
+    }, /depth exceeded/, "should reject deeply nested Any values via Message#toJSON");
+    test.throws(function() {
+        Loop.toObject(message, { json: true });
+    }, /depth exceeded/, "should reject deeply nested Any values via Type#toObject");
+    test.throws(function() {
+        Any.toObject(Any.decode(Any.encode(any).finish()), { json: true });
+    }, /depth exceeded/, "should reject deeply nested Any values when converting an Any directly");
 
     test.end();
 });

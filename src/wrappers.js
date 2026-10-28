@@ -7,7 +7,8 @@
  */
 var wrappers = exports;
 
-var Message = require("./message");
+var Message = require("./message"),
+    util    = require("./util/minimal");
 
 /**
  * From object converter part of an {@link IWrapper}.
@@ -65,7 +66,11 @@ wrappers[".google.protobuf.Any"] = {
         return this.fromObject(object, depth);
     },
 
-    toObject: function(message, options) {
+    toObject: function(message, options, depth) {
+        if (depth === undefined)
+            depth = 0;
+        if (depth > util.recursionLimit)
+            throw Error("max depth exceeded");
 
         // Default prefix
         var googleApi = "type.googleapis.com/";
@@ -81,12 +86,12 @@ wrappers[".google.protobuf.Any"] = {
             var type = this.lookup(name);
             /* istanbul ignore else */
             if (type)
-                message = type.decode(message.value);
+                message = type.decode(message.value, undefined, undefined, depth + 1);
         }
 
         // wrap value if unmapped
         if (!(message instanceof this.ctor) && message instanceof Message) {
-            var object = message.$type.toObject(message, options);
+            var object = message.$type.toObject(message, options, depth + 1);
             var messageName = message.$type.fullName[0] === "." ?
                 message.$type.fullName.slice(1) : message.$type.fullName;
             // Default to type.googleapis.com prefix if no prefix is used
@@ -98,6 +103,6 @@ wrappers[".google.protobuf.Any"] = {
             return object;
         }
 
-        return this.toObject(message, options);
+        return this.toObject(message, options, depth);
     }
 };

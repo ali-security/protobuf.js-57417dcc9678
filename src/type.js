@@ -576,8 +576,8 @@ Type.prototype.fromObject = function fromObject(object, depth) {
  * @param {IConversionOptions} [options] Conversion options
  * @returns {Object.<string,*>} Plain object
  */
-Type.prototype.toObject = function toObject(message, options) {
-    return this.setup().toObject(message, options);
+Type.prototype.toObject = function toObject(message, options) { // eslint-disable-line no-unused-vars
+    return this.setup().toObject.apply(this, arguments);
 };
 
 /**
