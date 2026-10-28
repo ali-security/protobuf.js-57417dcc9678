@@ -97,6 +97,13 @@ tape.test("reflected types", function(test) {
         type.add(new protobuf.Field("b", 2, "uint32"));
     }, Error, "should throw when trying to add reserved names");
 
+    test.throws(function() {
+        type.add(new protobuf.Field("$type", 2, "uint32"));
+    }, Error, "should throw when trying to add fields with runtime-reserved names");
+
+    test.throws(function() {
+        type.add(new protobuf.OneOf("$kind", [ "a" ]));
+    }, Error, "should throw when trying to add oneofs with runtime-reserved names");
 
     test.end();
 });
@@ -204,6 +211,21 @@ tape.test("object conversion nesting", function(test) {
     } finally {
         protobuf.util.recursionLimit = recursionLimit;
     }
+
+    test.end();
+});
+
+tape.test("object conversion allows null top-level fieldless messages", function(test) {
+    var root = protobuf.Root.fromJSON({
+        nested: {
+            Empty: {
+                fields: {}
+            }
+        }
+    });
+    var Empty = root.lookupType("Empty");
+
+    test.ok(Empty.fromObject(null) instanceof Empty.ctor, "should allow null top-level fieldless messages");
 
     test.end();
 });

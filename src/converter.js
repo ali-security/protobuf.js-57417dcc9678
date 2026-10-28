@@ -107,13 +107,13 @@ converter.fromObject = function fromObject(mtype) {
     var fields = mtype.fieldsArray;
     var gen = util.codegen(["d", "n"], mtype.name + "$fromObject")
     ("if(d instanceof this.ctor)")
-        ("return d")
-    ("if(n===undefined)n=0")
-    ("if(n>util.recursionLimit)")
-        ("throw Error(\"maximum nesting depth exceeded\")");
+        ("return d");
     if (!fields.length) return gen
     ("return new this.ctor");
     gen
+    ("if(n===undefined)n=0")
+    ("if(n>util.recursionLimit)")
+        ("throw Error(\"maximum nesting depth exceeded\")")
     ("var m=new this.ctor");
     for (var i = 0; i < fields.length; ++i) {
         var field  = fields[i].resolve(),
@@ -298,7 +298,7 @@ converter.toObject = function toObject(mtype) {
             genValuePartial_toObject(gen, field, /* sorted */ index, prop + "[j]")
         ("}");
         } else { gen
-    ("if(m%s!=null&&m.hasOwnProperty(%j)){", prop, field.name); // !== undefined && !== null
+    ("if(m%s!=null&&Object.hasOwnProperty.call(m,%j)){", prop, field.name); // !== undefined && !== null
         genValuePartial_toObject(gen, field, /* sorted */ index, prop);
         if (field.partOf) gen
         ("if(o.oneofs)")
