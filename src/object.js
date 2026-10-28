@@ -170,6 +170,8 @@ ReflectionObject.prototype.getOption = function getOption(name) {
  * @returns {ReflectionObject} `this`
  */
 ReflectionObject.prototype.setOption = function setOption(name, value, ifNotSet) {
+    if (name === "__proto__")
+        return this;
     if (!ifNotSet || !this.options || this.options[name] === undefined)
         (this.options || (this.options = {}))[name] = value;
     return this;
@@ -183,6 +185,8 @@ ReflectionObject.prototype.setOption = function setOption(name, value, ifNotSet)
  * @returns {ReflectionObject} `this`
  */
 ReflectionObject.prototype.setParsedOption = function setParsedOption(name, value, propName) {
+    if (name === "__proto__")
+        return this;
     if (!this.parsedOptions) {
         this.parsedOptions = [];
     }

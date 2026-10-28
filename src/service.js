@@ -9,6 +9,8 @@ var Method = require("./method"),
     util   = require("./util"),
     rpc    = require("./rpc");
 
+var reservedRe = util.patterns.reservedRe;
+
 /**
  * Constructs a new service instance.
  * @classdesc Reflected service.
@@ -98,8 +100,9 @@ function clearCache(service) {
  * @override
  */
 Service.prototype.get = function get(name) {
-    return this.methods[name]
-        || Namespace.prototype.get.call(this, name);
+    return Object.prototype.hasOwnProperty.call(this.methods, name)
+        ? this.methods[name]
+        : Namespace.prototype.get.call(this, name);
 };
 
 /**
@@ -116,12 +119,13 @@ Service.prototype.resolveAll = function resolveAll() {
  * @override
  */
 Service.prototype.add = function add(object) {
-
     /* istanbul ignore if */
     if (this.get(object.name))
         throw Error("duplicate name '" + object.name + "' in " + this);
 
     if (object instanceof Method) {
+        if (object.name === "__proto__")
+            return this;
         this.methods[object.name] = object;
         object.parent = this;
         return clearCache(this);
@@ -157,7 +161,7 @@ Service.prototype.create = function create(rpcImpl, requestDelimited, responseDe
     var rpcService = new rpc.Service(rpcImpl, requestDelimited, responseDelimited);
     for (var i = 0, method; i < /* initializes */ this.methodsArray.length; ++i) {
         var methodName = util.lcFirst((method = this._methodsArray[i]).resolve().name).replace(/[^$\w_]/g, "");
-        rpcService[methodName] = util.codegen(["r","c"], util.isReserved(methodName) ? methodName + "_" : methodName)("return this.rpcCall(m,q,s,r,c)")({
+        rpcService[methodName] = util.codegen(["r","c"], reservedRe.test(methodName) ? methodName + "_" : methodName)("return this.rpcCall(m,q,s,r,c)")({
             m: method,
             q: method.resolvedRequestType.ctor,
             s: method.resolvedResponseType.ctor

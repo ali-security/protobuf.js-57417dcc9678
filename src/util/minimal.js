@@ -17,7 +17,7 @@ util.float = require("@protobufjs/float");
 util.inquire = require("@protobufjs/inquire");
 
 // converts to / from utf8 encoded strings
-util.utf8 = require("@protobufjs/utf8");
+util.utf8 = require("./utf8");
 
 // provides a node-like buffer pool in the browser
 util.pool = require("@protobufjs/pool");
@@ -237,11 +237,34 @@ util.longFromHash = function longFromHash(hash, unsigned) {
 function merge(dst, src, ifNotSet) { // used by converters
     for (var keys = Object.keys(src), i = 0; i < keys.length; ++i)
         if (dst[keys[i]] === undefined || !ifNotSet)
-            dst[keys[i]] = src[keys[i]];
+            if (keys[i] !== "__proto__")
+                dst[keys[i]] = src[keys[i]];
     return dst;
 }
 
 util.merge = merge;
+
+/**
+ * Recursion limit.
+ * @memberof util
+ * @type {number}
+ */
+util.recursionLimit = 100;
+
+/**
+ * Makes a property safe for assignment as an own property.
+ * @memberof util
+ * @param {Object.<string,*>} obj Object
+ * @param {string} key Property key
+ * @returns {undefined}
+ */
+util.makeProp = function makeProp(obj, key) {
+    Object.defineProperty(obj, key, {
+        enumerable: true,
+        configurable: true,
+        writable: true
+    });
+};
 
 /**
  * Converts the first character of a string to lower case.

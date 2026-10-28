@@ -205,7 +205,7 @@ Type.generateConstructor = function generateConstructor(mtype) {
         else if (field.repeated) gen
             ("this%s=[]", util.safeProp(field.name));
     return gen
-    ("if(p)for(var ks=Object.keys(p),i=0;i<ks.length;++i)if(p[ks[i]]!=null)") // omit undefined or null
+    ("if(p)for(var ks=Object.keys(p),i=0;i<ks.length;++i)if(p[ks[i]]!=null&&ks[i]!==\"__proto__\")") // omit undefined or null
         ("this[ks[i]]=p[ks[i]]");
     /* eslint-enable no-unexpected-multiline */
 };
@@ -313,10 +313,13 @@ Type.prototype.resolveAll = function resolveAll() {
  * @override
  */
 Type.prototype.get = function get(name) {
-    return this.fields[name]
-        || this.oneofs && this.oneofs[name]
-        || this.nested && this.nested[name]
-        || null;
+    if (Object.prototype.hasOwnProperty.call(this.fields, name))
+        return this.fields[name];
+    if (this.oneofs && Object.prototype.hasOwnProperty.call(this.oneofs, name))
+        return this.oneofs[name];
+    if (this.nested && Object.prototype.hasOwnProperty.call(this.nested, name))
+        return this.nested[name];
+    return null;
 };
 
 /**
@@ -327,7 +330,6 @@ Type.prototype.get = function get(name) {
  * @throws {Error} If there is already a nested object with this name or, if a field, when there is already a field with this id
  */
 Type.prototype.add = function add(object) {
-
     if (this.get(object.name))
         throw Error("duplicate name '" + object.name + "' in " + this);
 
@@ -343,6 +345,8 @@ Type.prototype.add = function add(object) {
             throw Error("id " + object.id + " is reserved in " + this);
         if (this.isReservedName(object.name))
             throw Error("name '" + object.name + "' is reserved in " + this);
+        if (object.name === "__proto__")
+            return this;
 
         if (object.parent)
             object.parent.remove(object);
@@ -352,6 +356,8 @@ Type.prototype.add = function add(object) {
         return clearCache(this);
     }
     if (object instanceof OneOf) {
+        if (object.name === "__proto__")
+            return this;
         if (!this.oneofs)
             this.oneofs = {};
         this.oneofs[object.name] = object;
@@ -500,12 +506,14 @@ Type.prototype.encodeDelimited = function encodeDelimited(message, writer) {
  * Decodes a message of this type.
  * @param {Reader|Uint8Array} reader Reader or buffer to decode from
  * @param {number} [length] Length of the message, if known beforehand
+ * @param {number} [end] Expected group end tag, if decoding a group
+ * @param {number} [depth] Current nesting depth
  * @returns {Message<{}>} Decoded message
  * @throws {Error} If the payload is not a reader or valid buffer
  * @throws {util.ProtocolError<{}>} If required fields are missing
  */
-Type.prototype.decode = function decode_setup(reader, length) {
-    return this.setup().decode(reader, length); // overrides this method
+Type.prototype.decode = function decode_setup(reader, length, end, depth) {
+    return this.setup().decode(reader, length, end, depth); // overrides this method
 };
 
 /**
@@ -524,19 +532,21 @@ Type.prototype.decodeDelimited = function decodeDelimited(reader) {
 /**
  * Verifies that field values are valid and that required fields are present.
  * @param {Object.<string,*>} message Plain object to verify
+ * @param {number} [depth] Current nesting depth
  * @returns {null|string} `null` if valid, otherwise the reason why it is not
  */
-Type.prototype.verify = function verify_setup(message) {
-    return this.setup().verify(message); // overrides this method
+Type.prototype.verify = function verify_setup(message, depth) {
+    return this.setup().verify(message, depth); // overrides this method
 };
 
 /**
  * Creates a new message of this type from a plain object. Also converts values to their respective internal types.
  * @param {Object.<string,*>} object Plain object to convert
+ * @param {number} [depth] Current nesting depth
  * @returns {Message<{}>} Message instance
  */
-Type.prototype.fromObject = function fromObject(object) {
-    return this.setup().fromObject(object);
+Type.prototype.fromObject = function fromObject(object, depth) {
+    return this.setup().fromObject(object, depth);
 };
 
 /**
